@@ -1,27 +1,40 @@
 #!/usr/bin/env python3
+import sys
+import ctypes
+import subprocess
+import signal
+import time
 from scapy.all import *
 from colorama import Fore
 from tqdm import tqdm
-import signal
-import subprocess
-import sys
-import time
-import re
+import netifaces
 import ipaddress
 import argparse
+import re
 from multiprocessing import Process
-import netifaces
 
+# Check if the script is running with administrator privileges
+def check_admin():
+    if ctypes.windll.shell32.IsUserAnAdmin() == 0:
+        print(f"\n{Fore.RED + '┃'}  {Fore.GREEN + '['}{Fore.RED + '!'}{Fore.GREEN + ''}]"
+              f"{Fore.RED + ' This script requires administrator privileges.'}")
+        print(f"{Fore.BLUE + '┃'}  {Fore.GREEN + '['}{Fore.BLUE + '*'}{Fore.GREEN + ''}]"
+              f"{Fore.BLUE + ' Attempting to restart with admin privileges...'}")
+        time.sleep(1)
+        # Relaunch the script with admin rights
+        ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
+        sys.exit(0)
 
+check_admin()  # Check and request admin if necessary
+
+# Signal handler for Ctrl+C
 def ctrl_c(signum, frame):
     print(f"\n{Fore.BLUE + '┃'}  {Fore.GREEN + '['}{Fore.BLUE + '*'}{Fore.GREEN + ''}]"
           f"{Fore.BLUE + '  Exiting the program...'}")
     time.sleep(1)
     exit(1)
 
-
 signal.signal(signal.SIGINT, ctrl_c)
-
 
 # Colours
 def get_colours(text, color):
@@ -34,7 +47,6 @@ def get_colours(text, color):
     elif color == "green":
         red_color = Fore.GREEN + text
         print(red_color)
-
 
 # Script Banner
 def script_banner():
@@ -51,12 +63,9 @@ __/ /  / /___  _  /  / / _  ____/     _  /___  _    | _  __/   __/ /  _  /___  /
     print('\n\t\t', Fore.BLUE + owner_name)
     print(Fore.WHITE)
 
-
 def menu_panel():
-    get_colours(f"\n[{Fore.RED + '!'}{Fore.GREEN + ''}] Usage: sudo python3 " + sys.argv[
-        0] + " -i <Adaptor name / IP Address> -m <Mode> -f <Filename>", "green")
-    get_colours("――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――",
-                'red')
+    get_colours(f"\n[{Fore.RED + '!'}{Fore.GREEN + ''}] Usage: sudo python3 " + sys.argv[0] + " -i <Adaptor name / IP Address> -m <Mode> -f <Filename>", "green")
+    get_colours("――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――", 'red')
     print(f"\n{Fore.BLUE + '┃'}  {Fore.MAGENTA + '[-i]'}{Fore.YELLOW + ' Network Adaptor name / IP Address'}")
     print("")
     print(f"{Fore.BLUE + '┃'}  {Fore.MAGENTA + '[-m]'}{Fore.YELLOW + ' Mode to use'}")
@@ -85,13 +94,11 @@ def data_parser(packet_info):
             a.write(data.decode())
             a.close()
 
-
 def progressBar(final):
     print()
     for i in tqdm(range(1, final)):
         sys.stdout.write("\033[F")
     print()
-
 
 def send_file(ip_address, file_name):
     try:
@@ -128,7 +135,6 @@ def send_file(ip_address, file_name):
         print(Fore.WHITE)  # To avoid leaving the terminal with colours.
         exit()
 
-
 def checkInterface(arrayInt, userInt):
     if str(userInt) not in arrayInt:
         print(
@@ -137,10 +143,9 @@ def checkInterface(arrayInt, userInt):
         return False
     return True
 
-
 def check_permisson(ip, mode, filename):
     if mode == 'recv':
-        if os.getuid() != 0:
+        if not ctypes.windll.shell32.IsUserAnAdmin():
             print(f"\n{Fore.BLUE + '┃'}  {Fore.GREEN + '['}{Fore.RED + '!'}{Fore.GREEN + ''}]"
                   f"{Fore.RED + ' Run this script with administrator privileges.'}")
             exit()
@@ -172,7 +177,7 @@ def check_permisson(ip, mode, filename):
                 f"{Fore.YELLOW + 'Invalid IP-Address.'}")
             exit()
 
-        scan_host = subprocess.run([f"timeout 1 ping -c 1 {ip}"], stdout=subprocess.PIPE, shell=True)
+        scan_host = subprocess.run([f"ping -n 1 {ip}"], stdout=subprocess.PIPE, shell=True)
         split_ttl = str(scan_host).split()
         try:
             get_ttl_size = split_ttl[18]
@@ -188,7 +193,6 @@ def check_permisson(ip, mode, filename):
         except IndexError:
             print(f"\n{Fore.BLUE + '┃'}  {Fore.GREEN + '['}{Fore.RED + '!'}{Fore.GREEN + ''}]"
                   f"{Fore.RED + ' Host is not active.'}")
-
 
 def check_parms():
     if len(sys.argv) > 1:
@@ -211,14 +215,12 @@ def check_parms():
         else:
             print(f"\n{Fore.BLUE + '┃'}  {Fore.GREEN + '['}{Fore.RED + '!'}{Fore.GREEN + '] '}"
                   f"{Fore.YELLOW + 'Select a valid Mode: '}")
-            print(f"\n{Fore.RED + '┃'} {Fore.YELLOW + '1. send'}")
-            print(f"{Fore.RED + '┃'} {Fore.YELLOW + '2. recv'}")
-            print(Fore.WHITE)
+            print(f"\n{Fore.YELLOW + 'send'} or {Fore.YELLOW + 'recv'}")
             exit()
-
     else:
-        script_banner()
         menu_panel()
+        exit()
 
-
-check_parms()
+if __name__ == "__main__":
+    script_banner()
+    check_parms()
